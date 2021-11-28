@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os/user"
 	"strconv"
 	"time"
 
@@ -38,7 +39,12 @@ func sub(client mqtt.Client, topic string) {
 func newMqttMessageReceiver(topics []string, broker string, port int, messagePubHandler mqtt.MessageHandler) *MqttMessageReceiver {
 	opts := mqtt.NewClientOptions()
 	opts.AddBroker(fmt.Sprintf("tcp://%s:%d", broker, port))
-	opts.SetClientID("go_mqtt_client")
+
+	user, err := user.Current()
+	if err != nil {
+		panic(err)
+	}
+	opts.SetClientID("go_mqtt_client_" + user.Name + "_" + time.Now().String())
 
 	var connectHandler mqtt.OnConnectHandler = func(client mqtt.Client) {
 		fmt.Println("Connected")
