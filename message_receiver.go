@@ -57,7 +57,7 @@ func newMqttMessageReceiver(topics []string, broker string, port int, messagePub
 	opts.SetDefaultPublishHandler(messagePubHandler)
 	opts.OnConnect = connectHandler
 	opts.OnConnectionLost = connectLostHandler
-	opts.AutoReconnect = true
+	opts.SetAutoReconnect(true)
 
 	client := mqtt.NewClient(opts)
 	if token := client.Connect(); token.Wait() && token.Error() != nil {
