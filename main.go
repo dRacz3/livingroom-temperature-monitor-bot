@@ -69,7 +69,7 @@ func main() {
 				if ret > 0 {
 					ch <- sensor.TemperatureSensorReading{Status: true, Temperature: ret}
 				}
-			case <-time.After(time.Second * 3): // 60 second timeout on the channel wait
+			case <-time.After(time.Second * 60): // 60 second timeout on the channel wait
 				fmt.Println("Timeout...")
 				ch <- sensor.TemperatureSensorReading{Status: false, Temperature: 0.0}
 			}
