@@ -1,4 +1,4 @@
-package main
+package connection
 
 import (
 	"fmt"
@@ -10,18 +10,18 @@ import (
 )
 
 type MessageFloatMessageProcessor struct {
-	last_message      string
-	last_message_time time.Time
-	forward_channel   chan float64
+	LastMessage     string
+	LastMessageTime time.Time
+	ForwardChannel  chan float64
 }
 
-func (m *MessageFloatMessageProcessor) process_message(client mqtt.Client, msg mqtt.Message) {
+func (m *MessageFloatMessageProcessor) ProcessMessage(client mqtt.Client, msg mqtt.Message) {
 	fmt.Printf("Received message: %s from topic: %s\n", msg.Payload(), msg.Topic())
 	temp, err := strconv.ParseFloat((string(msg.Payload())), 64)
 	if err != nil {
-		m.forward_channel <- 0.0
+		m.ForwardChannel <- 0.0
 	}
-	m.forward_channel <- temp
+	m.ForwardChannel <- temp
 }
 
 type MqttMessageReceiver struct {
@@ -36,7 +36,7 @@ func sub(client mqtt.Client, topic string) {
 	token.Wait()
 	fmt.Printf("Subscribed to topic %s", topic)
 }
-func newMqttMessageReceiver(topics []string, broker string, port int, messagePubHandler mqtt.MessageHandler) *MqttMessageReceiver {
+func NewMqttMessageReceiver(topics []string, broker string, port int, messagePubHandler mqtt.MessageHandler) *MqttMessageReceiver {
 	opts := mqtt.NewClientOptions()
 	opts.AddBroker(fmt.Sprintf("tcp://%s:%d", broker, port))
 

@@ -1,39 +1,46 @@
-package main
+package connection
 
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 )
 
 type WebhookMessageSender struct {
-	webhook_url string
+	WebhookUrl string
 }
 
 type Payload struct {
 	Text string `json:"text"`
 }
 
-func (s *WebhookMessageSender) send_message(text string) {
+func (s *WebhookMessageSender) SendMessage(text string) error {
 
 	data := Payload{
 		Text: text,
 	}
 	payloadBytes, err := json.Marshal(data)
 	if err != nil {
-		println(err)
+		fmt.Println(err)
+		return err
 	}
 	body := bytes.NewReader(payloadBytes)
 
-	req, err := http.NewRequest("POST", s.webhook_url, body)
+	req, err := http.NewRequest("POST", s.WebhookUrl, body)
 	if err != nil {
-		println(err)
+		fmt.Println(err)
+		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		println(err)
+		fmt.Println(err)
+		return err
 	}
+
 	defer resp.Body.Close()
+	return nil
+
 }
