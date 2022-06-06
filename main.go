@@ -6,6 +6,8 @@ import (
 	"log"
 	"mqtt_sentry/connection"
 	"mqtt_sentry/sensor"
+	"os"
+	"os/signal"
 	"time"
 )
 
@@ -38,12 +40,16 @@ func parse_args() ParsedArgs {
 func gracefulExit(messageSender connection.WebhookMessageSender) {
 	failure := recover()
 	if failure != nil {
-		messageSender.SendMessage(fmt.Sprintf("MQTT Monitor exit: %#v", failure))
 		fmt.Printf("Failure: %#v", failure)
+		messageSender.SendMessage(fmt.Sprintf("MQTT Monitor exit: %#v", failure))
+		fmt.Println("Exiting...")
+
 	}
 }
 
 func main() {
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
 
 	fmt.Println("Starting thermostat monitor")
 	args := parse_args()
@@ -54,6 +60,13 @@ func main() {
 	ch := make(chan sensor.TemperatureSensorReading)
 	slackClient := connection.WebhookMessageSender{WebhookUrl: args.webhook_url}
 	defer gracefulExit(slackClient)
+	go func() {
+		for sig := range c {
+			slackClient.SendMessage(fmt.Sprintf("MQTT Monitor exit signal caught: %#v", sig))
+			log.Fatal("Caused by: ", sig)
+		}
+	}()
+
 	messageProcessor := connection.MessageFloatMessageProcessor{LastMessage: "", LastMessageTime: time.Now(), ForwardChannel: temperatureChannel}
 
 	connection.NewMqttMessageReceiver(channels, args.broker_host, args.broker_port, messageProcessor.ProcessMessage)
