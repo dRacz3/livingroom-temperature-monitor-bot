@@ -35,40 +35,41 @@ func parse_args() ParsedArgs {
 	return parsed
 }
 
-func gracefulExit() {
+func gracefulExit(messageSender connection.WebhookMessageSender) {
 	failure := recover()
 	if failure != nil {
+		messageSender.SendMessage(fmt.Sprintf("MQTT Monitor exit: %#v", failure))
 		fmt.Printf("Failure: %#v", failure)
 	}
 }
 
 func main() {
-	defer gracefulExit()
 
 	fmt.Println("Starting thermostat monitor")
 	args := parse_args()
 
 	channels := []string{args.channel_to_watch}
 
-	temperature_channel := make(chan float64)
+	temperatureChannel := make(chan float64)
 	ch := make(chan sensor.TemperatureSensorReading)
-	slack_client := connection.WebhookMessageSender{WebhookUrl: args.webhook_url}
-	message_processor := connection.MessageFloatMessageProcessor{LastMessage: "", LastMessageTime: time.Now(), ForwardChannel: temperature_channel}
+	slackClient := connection.WebhookMessageSender{WebhookUrl: args.webhook_url}
+	defer gracefulExit(slackClient)
+	messageProcessor := connection.MessageFloatMessageProcessor{LastMessage: "", LastMessageTime: time.Now(), ForwardChannel: temperatureChannel}
 
-	connection.NewMqttMessageReceiver(channels, args.broker_host, args.broker_port, message_processor.ProcessMessage)
+	connection.NewMqttMessageReceiver(channels, args.broker_host, args.broker_port, messageProcessor.ProcessMessage)
 
-	var thermostat_status sensor.TemperatureSensorStatus
+	var thermostatStatus sensor.TemperatureSensorStatus
 
-	var last_reported_status sensor.TemperatureSensorStatus
+	var lastReportedStatus sensor.TemperatureSensorStatus
 
 	for { // loop forever
 		go func() {
 			select {
-			case ret := <-temperature_channel:
+			case ret := <-temperatureChannel:
 				if ret > 0 {
 					ch <- sensor.TemperatureSensorReading{Status: true, Temperature: ret}
 				}
-			case <-time.After(time.Second * 60): // 60 second timeout on the channel wait
+			case <-time.After(time.Second * 3): // 60 second timeout on the channel wait
 				fmt.Println("Timeout...")
 				ch <- sensor.TemperatureSensorReading{Status: false, Temperature: 0.0}
 			}
@@ -77,19 +78,19 @@ func main() {
 		res := <-ch
 		if res.Status {
 
-			last_message_was_long_time_ago := time.Until(last_reported_status.LastStatusChange()) < -1*time.Hour
+			last_message_was_long_time_ago := time.Until(lastReportedStatus.LastStatusChange()) < -1*time.Hour
 
-			if !thermostat_status.IsAvailable() || last_message_was_long_time_ago {
-				slack_client.SendMessage(fmt.Sprintf("Living Room/Temperature: %f", res.Temperature))
-				thermostat_status.Update(true, res.Temperature)
-				last_reported_status.Update(true, res.Temperature)
+			if !thermostatStatus.IsAvailable() || last_message_was_long_time_ago {
+				slackClient.SendMessage(fmt.Sprintf("Living Room/Temperature: %f", res.Temperature))
+				thermostatStatus.Update(true, res.Temperature)
+				lastReportedStatus.Update(true, res.Temperature)
 			}
 
 		} else {
-			if thermostat_status.IsAvailable() {
-				slack_client.SendMessage("MIA Temperature sensor")
-				thermostat_status.Update(false, 0.0)
-				println("No valid temperature")
+			if thermostatStatus.IsAvailable() {
+				slackClient.SendMessage("MIA Temperature sensor")
+				thermostatStatus.Update(false, 0.0)
+				fmt.Println("No valid temperature received")
 			}
 		}
 	}
