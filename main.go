@@ -9,6 +9,9 @@ import (
 	"os"
 	"os/signal"
 	"time"
+
+	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/monitor"
 )
 
 type ParsedArgs struct {
@@ -47,7 +50,7 @@ func gracefulExit(messageSender connection.WebhookMessageSender) {
 	}
 }
 
-func main() {
+func mqttLoop() {
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt)
 
@@ -107,4 +110,20 @@ func main() {
 			}
 		}
 	}
+}
+
+func loopServerForStatus() {
+	app := fiber.New()
+
+	app.Get("/metrics", monitor.New(monitor.Config{Title: "Heart of Irongate"}))
+	app.Get("/ping", func(c *fiber.Ctx) error {
+		return c.SendString("pong")
+	})
+	log.Fatal(app.Listen(":3000"))
+
+}
+
+func main() {
+	go mqttLoop()
+	loopServerForStatus()
 }
